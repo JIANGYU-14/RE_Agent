@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-from datetime import datetime
-=======
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 from typing import List, Dict, Any
 
 from sqlalchemy import (
@@ -17,19 +13,13 @@ from sqlalchemy import (
     ForeignKey,
     select,
     insert,
-<<<<<<< HEAD
-=======
     delete,
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import Engine
 
-<<<<<<< HEAD
-=======
 from app.core.time_utils import iso_bjt, now_bjt_naive
 
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 metadata = MetaData()
 
@@ -84,11 +74,7 @@ class MessagesRepo:
         ]
         """
 
-<<<<<<< HEAD
-        now = datetime.utcnow()
-=======
         now = now_bjt_naive()
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
         with self.engine.begin() as conn:
             # 1️⃣ insert message (INT4 id)
@@ -154,11 +140,7 @@ class MessagesRepo:
             if mid not in messages:
                 messages[mid] = {
                     "role": r["role"],
-<<<<<<< HEAD
-                    "created_at": r["created_at"].isoformat(),
-=======
                     "created_at": iso_bjt(r["created_at"]),
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
                     "parts": [],
                 }
 
@@ -173,8 +155,6 @@ class MessagesRepo:
                 )
 
         return list(messages.values())
-<<<<<<< HEAD
-=======
 
     def delete_by_session_id(self, session_id: str) -> None:
         msg_ids_stmt = select(messages_table.c.id).where(messages_table.c.session_id == session_id)
@@ -186,4 +166,3 @@ class MessagesRepo:
         with self.engine.begin() as conn:
             conn.execute(parts_del_stmt)
             conn.execute(msgs_del_stmt)
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)

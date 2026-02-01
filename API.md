@@ -1,23 +1,5 @@
 # Backend API 文档
 
-<<<<<<< HEAD
-本文档基于当前代码实现生成，入口为 `backend_stream/app/main.py`，默认将业务 API 挂载在 `/paperapi` 前缀下。
-
-## 1. 服务入口与路由
-
-- FastAPI 应用：`backend_stream/app/main.py:7`
-- 路由挂载：
-  - `/paperapi`：`sessions`、`chat`、`history`（`backend_stream/app/main.py:45-56`）
-  - 非 `/paperapi`：健康检查与初始化（`backend_stream/app/main.py:18-43`）
-
-## 2. 数据库结构（SQLAlchemy Core）
-
-建表逻辑：`backend_stream/app/core/db.py:34-41`（通过 `create_all` 创建，未使用迁移工具）。
-
-### 2.1 `sessions` 表
-
-定义：`backend_stream/app/repositories/sessions_repo.py:23-33`
-=======
 本文档基于当前代码实现生成，入口为 `RE_Agent/app/main.py`，默认将业务 API 挂载在 `/paperapi` 前缀下。
 
 ## 1. 服务入口与路由
@@ -34,7 +16,6 @@
 ### 2.1 `sessions` 表
 
 定义：`RE_Agent/app/repositories/sessions_repo.py:23-33`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 | 字段 | 类型 | 约束 | 说明 |
 |---|---|---|---|
@@ -43,23 +24,6 @@
 | `user_id` | String | NOT NULL | 用户标识（来自请求 Body） |
 | `status` | String | NOT NULL | `active` / `archived` |
 | `title` | Text | NOT NULL | 会话标题，默认 `新对话` |
-<<<<<<< HEAD
-| `created_at` | DateTime | NOT NULL | 创建时间（UTC） |
-| `updated_at` | DateTime | NOT NULL | 更新时间（UTC） |
-
-仓储方法：
-
-- 创建会话：`SessionsRepo.create_session`（`backend_stream/app/repositories/sessions_repo.py:40-63`）
-- 列表会话：`SessionsRepo.list_sessions`（仅 `status=active`，按 `updated_at desc`）（`backend_stream/app/repositories/sessions_repo.py:65-93`）
-- 查询会话：`SessionsRepo.get_session`（`backend_stream/app/repositories/sessions_repo.py:95-122`）
-- 更新时间：`SessionsRepo.touch_session`（`backend_stream/app/repositories/sessions_repo.py:124-133`）
-- 更新标题：`SessionsRepo.update_title`（`backend_stream/app/repositories/sessions_repo.py:134-145`）
-- 归档会话：`SessionsRepo.archive_session`（`backend_stream/app/repositories/sessions_repo.py:147-158`）
-
-### 2.2 `messages` 表
-
-定义：`backend_stream/app/repositories/messages_repo.py:26-33`
-=======
 | `created_at` | DateTime | NOT NULL | 创建时间（北京时间，UTC+8） |
 | `updated_at` | DateTime | NOT NULL | 更新时间（北京时间，UTC+8） |
 
@@ -75,26 +39,17 @@
 ### 2.2 `messages` 表
 
 定义：`RE_Agent/app/repositories/messages_repo.py:26-33`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 | 字段 | 类型 | 约束 | 说明 |
 |---|---|---|---|
 | `id` | Integer | PK | 自增主键 |
 | `session_id` | String | NOT NULL | 关联会话 ID（当前未加外键） |
 | `role` | String(16) | NOT NULL | `user` / `assistant` 等 |
-<<<<<<< HEAD
-| `created_at` | DateTime | NOT NULL | 创建时间（UTC） |
-
-### 2.3 `message_parts` 表
-
-定义：`backend_stream/app/repositories/messages_repo.py:35-50`
-=======
 | `created_at` | DateTime | NOT NULL | 创建时间（北京时间，UTC+8） |
 
 ### 2.3 `message_parts` 表
 
 定义：`RE_Agent/app/repositories/messages_repo.py:35-50`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 | 字段 | 类型 | 约束 | 说明 |
 |---|---|---|---|
@@ -108,15 +63,6 @@
 
 读写逻辑：
 
-<<<<<<< HEAD
-- 写入：`MessagesRepo.save_message` 先插入 `messages` 拿到 `id`，再按顺序插入 `message_parts`（`backend_stream/app/repositories/messages_repo.py:61-103`）
-- 读取：`MessagesRepo.list_messages` 将 JOIN 结果聚合为按 message 分组的结构（`backend_stream/app/repositories/messages_repo.py:106-155`）
-
-## 3. 认证与鉴权
-
-当前 backend_stream 不强制要求任何鉴权 Header。
-对话接口调用 AgentKit 的鉴权来自环境变量 `AGENTKIT_API_KEY`（`backend_stream/app/core/agentkit_client.py:17-18`）。
-=======
 - 写入：`MessagesRepo.save_message` 先插入 `messages` 拿到 `id`，再按顺序插入 `message_parts`（`RE_Agent/app/repositories/messages_repo.py:61-103`）
 - 读取：`MessagesRepo.list_messages` 将 JOIN 结果聚合为按 message 分组的结构（`RE_Agent/app/repositories/messages_repo.py:106-155`）
 
@@ -124,18 +70,13 @@
 
 当前 RE_Agent 不强制要求任何鉴权 Header。
 对话接口调用 AgentKit 的鉴权来自环境变量 `AGENTKIT_API_KEY`（`RE_Agent/app/core/agentkit_client.py`）。
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 ## 4. API 列表（/paperapi）
 
 ### 4.1 创建会话
 
 - 方法：`POST /paperapi/sessions`
-<<<<<<< HEAD
-- 代码：`backend_stream/app/api/sessions.py:18-26`
-=======
 - 代码：`RE_Agent/app/api/sessions.py:23-31`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 - Body：
 
 ```json
@@ -151,24 +92,15 @@
   "user_id": "u123",
   "status": "active",
   "title": "新对话",
-<<<<<<< HEAD
-  "created_at": "2026-01-18T12:00:00.000000",
-  "updated_at": "2026-01-18T12:00:00.000000"
-=======
   "created_at": "2026-01-18T12:00:00.000000+08:00",
   "updated_at": "2026-01-18T12:00:00.000000+08:00"
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 }
 ```
 
 ### 4.2 获取用户会话列表（仅 active）
 
 - 方法：`GET /paperapi/sessions/list`
-<<<<<<< HEAD
-- 代码：`backend_stream/app/api/sessions.py:33-47`
-=======
 - 代码：`RE_Agent/app/api/sessions.py:34-43`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 - Query：
   - `user_id: string`（必填）
 - Response（200）：
@@ -181,25 +113,13 @@
       "user_id": "u123",
       "status": "active",
       "title": "新对话",
-<<<<<<< HEAD
-      "created_at": "2026-01-18T12:00:00.000000",
-      "updated_at": "2026-01-18T12:00:10.000000"
-=======
       "created_at": "2026-01-18T12:00:00.000000+08:00",
       "updated_at": "2026-01-18T12:00:10.000000+08:00"
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
     }
   ]
 }
 ```
 
-<<<<<<< HEAD
-### 4.3 对话（写入消息 + 调用 AgentKit 流式输出 + 写入回复 + 触发标题生成）
-
-- 方法：`POST /paperapi/chat`
-- 代码：`backend_stream/app/api/chat.py:45-108`
-- Body：`ChatRequest`（`backend_stream/app/api/chat.py:22-25`）
-=======
 ### 4.3 会话重命名
 
 - 方法：`PATCH /paperapi/sessions/{session_id}/title`
@@ -246,7 +166,6 @@
 - 方法：`POST /paperapi/chat`
 - 代码：`RE_Agent/app/api/chat.py:45-107`
 - Body：`ChatRequest`（`RE_Agent/app/api/chat.py:22-25`）
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 ```json
 {
@@ -260,12 +179,9 @@
   - `session_id`: (Required) 会话 ID
   - `text`: (Required) 用户输入文本
   - `use_public_paper`: (Optional, default=false) 是否启用公开知识库搜索。若为 true，Agent 将同时检索私有库与公开库并聚合结果。
-<<<<<<< HEAD
-=======
 - 错误码：
   - 404：`session not found`（会话不存在）
   - 409：`session is not active`（会话非 active，例如已归档）
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 - Response：`text/event-stream`
 
@@ -280,17 +196,10 @@ data: {"type": "thought", "content": "{...status-update...}"}
 - `type=thought`：过程状态与调试信息
 - `type=error`：流式错误信息
 
-<<<<<<< HEAD
-### 4.4 获取会话消息历史
-
-- 方法：`GET /paperapi/sessions/{session_id}/messages`
-- 代码：`backend_stream/app/api/history.py:12-18`
-=======
 ### 4.6 获取会话消息历史
 
 - 方法：`GET /paperapi/sessions/{session_id}/messages`
 - 代码：`RE_Agent/app/api/history.py:12-18`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 - Response（200）：
 
 ```json
@@ -299,11 +208,7 @@ data: {"type": "thought", "content": "{...status-update...}"}
   "messages": [
     {
       "role": "user",
-<<<<<<< HEAD
-      "created_at": "2026-01-18T12:00:00.000000",
-=======
       "created_at": "2026-01-18T12:00:00.000000+08:00",
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
       "parts": [
         {
           "type": "text",
@@ -315,11 +220,7 @@ data: {"type": "thought", "content": "{...status-update...}"}
     },
     {
       "role": "assistant",
-<<<<<<< HEAD
-      "created_at": "2026-01-18T12:00:01.000000",
-=======
       "created_at": "2026-01-18T12:00:01.000000+08:00",
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
       "parts": [
         {
           "type": "text",
@@ -338,11 +239,7 @@ data: {"type": "thought", "content": "{...status-update...}"}
 ### 5.1 数据库连通性检查
 
 - 方法：`GET /health/db`
-<<<<<<< HEAD
-- 代码：`backend_stream/app/main.py:18-29`
-=======
 - 代码：`RE_Agent/app/main.py:27-39`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 - 成功：
 
 ```json
@@ -358,11 +255,7 @@ data: {"type": "thought", "content": "{...status-update...}"}
 ### 5.2 初始化建表
 
 - 方法：`POST /admin/init-db`
-<<<<<<< HEAD
-- 代码：`backend_stream/app/main.py:32-43`
-=======
 - 代码：`RE_Agent/app/main.py:41-50`
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 - 成功：
 
 ```json

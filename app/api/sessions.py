@@ -1,13 +1,7 @@
-<<<<<<< HEAD
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-
-=======
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.repositories.messages_repo import MessagesRepo
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 from app.repositories.sessions_repo import SessionsRepo
 from app.core.db import get_engine
 
@@ -20,12 +14,9 @@ router = APIRouter()
 def get_sessions_repo() -> SessionsRepo:
     return SessionsRepo(get_engine())
 
-<<<<<<< HEAD
-=======
 def get_messages_repo() -> MessagesRepo:
     return MessagesRepo(get_engine())
 
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 # ---------- api ----------
 
@@ -33,13 +24,10 @@ class CreateSessionRequest(BaseModel):
     user_id: str
 
 
-<<<<<<< HEAD
-=======
 class RenameSessionRequest(BaseModel):
     title: str
 
 
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 @router.post("/sessions")
 def create_session(
     payload: CreateSessionRequest,
@@ -61,8 +49,6 @@ def list_user_sessions(
     """
     sessions = sessions_repo.list_sessions(user_id)
     return {"sessions": sessions}
-<<<<<<< HEAD
-=======
 
 
 @router.patch("/sessions/{session_id}/title")
@@ -100,4 +86,3 @@ def delete_session(
     else:
         sessions_repo.archive_session(session_id)
     return {"ok": True}
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)

@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-<<<<<<< HEAD
-from datetime import datetime
-=======
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -17,18 +13,12 @@ from sqlalchemy import (
     select,
     insert,
     update,
-<<<<<<< HEAD
-)
-from sqlalchemy.engine import Engine
-
-=======
     delete,
 )
 from sqlalchemy.engine import Engine
 
 from app.core.time_utils import iso_bjt, now_bjt_naive
 
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
 
 metadata = MetaData()
 
@@ -50,11 +40,7 @@ class SessionsRepo:
         self.engine = engine
 
     def create_session(self, user_id: str) -> dict:
-<<<<<<< HEAD
-        now = datetime.utcnow()
-=======
         now = now_bjt_naive()
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
         session_id = str(uuid4())
 
         stmt = insert(sessions_table).values(
@@ -74,13 +60,8 @@ class SessionsRepo:
             "user_id": user_id,
             "status": "active",
             "title": "新对话",
-<<<<<<< HEAD
-            "created_at": now.isoformat(),
-            "updated_at": now.isoformat(),
-=======
             "created_at": iso_bjt(now),
             "updated_at": iso_bjt(now),
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
         }
 
     def list_sessions(self, user_id: str) -> list[dict]:
@@ -107,13 +88,8 @@ class SessionsRepo:
                 "user_id": r["user_id"],
                 "status": r["status"],
                 "title": r["title"],
-<<<<<<< HEAD
-                "created_at": r["created_at"].isoformat(),
-                "updated_at": r["updated_at"].isoformat(),
-=======
                 "created_at": iso_bjt(r["created_at"]),
                 "updated_at": iso_bjt(r["updated_at"]),
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
             }
             for r in rows
         ]
@@ -143,24 +119,15 @@ class SessionsRepo:
             "user_id": row["user_id"],
             "status": row["status"],
             "title": row["title"],
-<<<<<<< HEAD
-            "created_at": row["created_at"].isoformat(),
-            "updated_at": row["updated_at"].isoformat(),
-=======
             "created_at": iso_bjt(row["created_at"]),
             "updated_at": iso_bjt(row["updated_at"]),
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
         }
 
     def touch_session(self, session_id: str) -> None:
         stmt = (
             update(sessions_table)
             .where(sessions_table.c.session_id == session_id)
-<<<<<<< HEAD
-            .values(updated_at=datetime.utcnow())
-=======
             .values(updated_at=now_bjt_naive())
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
         )
 
         with self.engine.begin() as conn:
@@ -172,11 +139,7 @@ class SessionsRepo:
             .where(sessions_table.c.session_id == session_id)
             .values(
                 title=title,
-<<<<<<< HEAD
-                updated_at=datetime.utcnow(),
-=======
                 updated_at=now_bjt_naive(),
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
             )
         )
 
@@ -189,22 +152,15 @@ class SessionsRepo:
             .where(sessions_table.c.session_id == session_id)
             .values(
                 status="archived",
-<<<<<<< HEAD
-                updated_at=datetime.utcnow(),
-=======
                 updated_at=now_bjt_naive(),
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
             )
         )
 
         with self.engine.begin() as conn:
             conn.execute(stmt)
-<<<<<<< HEAD
-=======
 
     def delete_session(self, session_id: str) -> None:
         stmt = delete(sessions_table).where(sessions_table.c.session_id == session_id)
 
         with self.engine.begin() as conn:
             conn.execute(stmt)
->>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
