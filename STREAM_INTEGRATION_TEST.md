@@ -1,6 +1,6 @@
 # Agent Service 本地流式联调文档
 
-本文档用于指导和验证 `backend_stream` (8002) 与 `agent_service` (8000) 之间的流式通信链路。
+本文档用于指导和验证 `RE_Agent` (8002) 与 `agent_service` (8000) 之间的流式通信链路。
 
 ## 1. 环境准备
 
@@ -9,8 +9,8 @@
     *   路径: `agent_service/src`
     *   端口: `8000`
     *   启动: `python agent.py`
-*   **Backend Stream**: 负责 API 接入、流式转发与数据持久化。
-    *   路径: `backend_stream`
+*   **RE_Agent Backend**: 负责 API 接入、流式转发与数据持久化。
+    *   路径: `RE_Agent`
     *   端口: `8002`
     *   启动: `python run.py`
 
@@ -24,16 +24,107 @@ cd agent_service/src
 python agent.py
 ```
 
-**Terminal B (Backend Stream):**
+**Terminal B (RE_Agent Backend):**
 ```bash
-cd backend_stream
+cd RE_Agent
 # 确保已安装依赖: pip install -r requirements.txt
 python run.py
 ```
 
 ## 2. 测试用例
 
-### 2.1 基础问候 (Basic Greeting)
+### 2.1 数据库健康检查
+验证数据库连通性。
+
+**请求命令:**
+```bash
+curl http://localhost:8002/health/db
+```
+
+**预期输出:**
+```json
+{"ok": true}
+```
+
+### 2.2 初始化建表
+仅首次启动或本地重置后执行。
+
+**请求命令:**
+```bash
+curl -X POST http://localhost:8002/admin/init-db
+```
+
+**预期输出:**
+```json
+{"ok": true}
+```
+
+### 2.3 创建会话
+
+**请求命令:**
+```bash
+curl -X POST http://localhost:8002/paperapi/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"debug_user"}'
+```
+记录返回的 `session_id`，用于后续请求。
+
+### 2.4 获取会话列表
+验证只返回 `active` 会话。
+
+**请求命令:**
+```bash
+curl "http://localhost:8002/paperapi/sessions/list?user_id=debug_user"
+```
+
+**预期输出:**
+返回包含 `sessions` 数组，并能找到上一步创建的 `session_id`。
+
+### 2.5 会话重命名
+
+**请求命令:**
+```bash
+curl -X PATCH http://localhost:8002/paperapi/sessions/<session_id>/title \
+  -H "Content-Type: application/json" \
+  -d '{"title":"我的新标题"}'
+```
+
+**预期输出:**
+返回更新后的会话对象，`title` 为新值。
+
+### 2.6 会话删除（归档 / 永久删除）
+
+**请求命令（归档，默认）:**
+```bash
+curl -X DELETE http://localhost:8002/paperapi/sessions/<session_id>
+```
+
+**预期输出:**
+```json
+{"ok": true}
+```
+
+**验证命令（可选）:**
+```bash
+curl "http://localhost:8002/paperapi/sessions/list?user_id=debug_user"
+```
+预期已归档会话不再出现在列表中。
+
+**请求命令（永久删除）:**
+```bash
+curl -X DELETE "http://localhost:8002/paperapi/sessions/<session_id>?hard=true"
+```
+
+**预期输出:**
+```json
+{"ok": true}
+```
+
+**验证要点:**
+- 永久删除后再次调用 `POST /paperapi/chat`，预期返回 404 `session not found`。
+- 归档后再次调用 `POST /paperapi/chat`，预期返回 409 `session is not active`。
+
+### 2.7 基础问候 (Basic Greeting)
 验证链路连通性及基础 SSE 格式。
 
 **前置步骤：创建会话（必须）**
@@ -64,7 +155,7 @@ data: {"type": "text", "content": "有什么"}
 ...
 ```
 
-### 2.2 知识库检索 (KB Retrieval)
+### 2.8 知识库检索 (KB Retrieval)
 验证 Agent 执行复杂工具调用时的流式响应。
 
 **前置步骤：创建会话（必须）**
@@ -89,10 +180,24 @@ curl -N -X POST http://localhost:8002/paperapi/chat \
 **预期输出:**
 应包含逐步生成的总结内容，而非一次性返回长文本。
 
-### 2.3 异常处理
+### 2.9 获取会话消息历史
+验证 chat 写入的消息已持久化。
+
+**前置步骤：完成一次对话**
+执行 2.7 或 2.8 后再进行本步骤。
+
+**请求命令:**
+```bash
+curl http://localhost:8002/paperapi/sessions/<session_id>/messages
+```
+
+**预期输出:**
+返回 `messages` 数组，包含 `user` 与 `assistant` 的消息记录。
+
+### 2.10 异常处理
 验证 Agent 服务未启动时的报错。
 
-**操作:** 停止 8000 端口服务后执行上述命令。
+**操作:** 停止 8000 端口服务后执行 2.7 或 2.8 的请求命令。
 
 **预期输出:**
 ```

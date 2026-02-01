@@ -51,6 +51,15 @@ async def chat(
     session_id = payload.session_id
     user_text = payload.text
 
+<<<<<<< HEAD
+=======
+    session = sessions_repo.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="session not found")
+    if session.get("status") != "active":
+        raise HTTPException(status_code=409, detail="session is not active")
+
+>>>>>>> bfb5c23 (Add session delete hard option and chat session validation)
     # 1️⃣ save user message
     messages_repo.save_message(
         session_id=session_id,

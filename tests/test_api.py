@@ -1,6 +1,10 @@
 import pytest
 from unittest.mock import MagicMock
+from datetime import datetime, timedelta
 
+from app.core import db
+from app.repositories.messages_repo import MessagesRepo
+from app.repositories.sessions_repo import SessionsRepo
 from app.services.session_title import _generate
 
 
@@ -28,6 +32,98 @@ def test_list_sessions(client):
     data = response.json()
     assert "sessions" in data
     assert len(data["sessions"]) == 2
+
+
+def test_rename_session_title(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_rename"})
+    session_id = create_resp.json()["session_id"]
+
+    rename_resp = client.patch(
+        f"/paperapi/sessions/{session_id}/title",
+        json={"title": "我的新标题"},
+    )
+    assert rename_resp.status_code == 200
+    assert rename_resp.json()["title"] == "我的新标题"
+
+    resp = client.get("/paperapi/sessions/list", params={"user_id": "user_rename"})
+    sessions = resp.json()["sessions"]
+    assert len(sessions) == 1
+    assert sessions[0]["title"] == "我的新标题"
+
+
+def test_delete_session(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_delete"})
+    session_id = create_resp.json()["session_id"]
+
+    del_resp = client.delete(f"/paperapi/sessions/{session_id}")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["ok"] is True
+
+    resp = client.get("/paperapi/sessions/list", params={"user_id": "user_delete"})
+    assert resp.status_code == 200
+    assert resp.json()["sessions"] == []
+
+def test_hard_delete_session(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_hard_delete"})
+    session_id = create_resp.json()["session_id"]
+
+    with client.stream("POST", "/paperapi/chat", json={"session_id": session_id, "text": "Hello"}) as response:
+        assert response.status_code == 200
+        list(response.iter_lines())
+
+    del_resp = client.delete(f"/paperapi/sessions/{session_id}", params={"hard": "true"})
+    assert del_resp.status_code == 200
+    assert del_resp.json()["ok"] is True
+
+    sessions_repo = SessionsRepo(db.get_engine())
+    assert sessions_repo.get_session(session_id) is None
+
+    messages_repo = MessagesRepo(db.get_engine())
+    assert messages_repo.list_messages(session_id) == []
+
+    resp = client.get("/paperapi/sessions/list", params={"user_id": "user_hard_delete"})
+    assert resp.status_code == 200
+    assert resp.json()["sessions"] == []
+
+def test_chat_requires_existing_session(client):
+    resp = client.post("/paperapi/chat", json={"session_id": "missing_session", "text": "Hi"})
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "session not found"
+
+def test_chat_rejects_archived_session(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_archived"})
+    session_id = create_resp.json()["session_id"]
+
+    del_resp = client.delete(f"/paperapi/sessions/{session_id}")
+    assert del_resp.status_code == 200
+
+    chat_resp = client.post("/paperapi/chat", json={"session_id": session_id, "text": "Hi"})
+    assert chat_resp.status_code == 409
+    assert chat_resp.json()["detail"] == "session is not active"
+
+
+def test_timestamps_are_beijing(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_tz"})
+    assert create_resp.status_code == 200
+    data = create_resp.json()
+
+    created_at = datetime.fromisoformat(data["created_at"])
+    updated_at = datetime.fromisoformat(data["updated_at"])
+    assert created_at.utcoffset() == timedelta(hours=8)
+    assert updated_at.utcoffset() == timedelta(hours=8)
+
+    session_id = data["session_id"]
+    with client.stream("POST", "/paperapi/chat", json={"session_id": session_id, "text": "Hello"}) as response:
+        assert response.status_code == 200
+        list(response.iter_lines())
+
+    hist_resp = client.get(f"/paperapi/sessions/{session_id}/messages")
+    assert hist_resp.status_code == 200
+    messages = hist_resp.json()["messages"]
+    assert len(messages) >= 2
+
+    msg_created_at = datetime.fromisoformat(messages[0]["created_at"])
+    assert msg_created_at.utcoffset() == timedelta(hours=8)
 
 
 def test_chat_flow(client):
