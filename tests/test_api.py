@@ -59,6 +59,10 @@ def test_delete_session(client):
     assert del_resp.status_code == 200
     assert del_resp.json()["ok"] is True
 
+    hist_resp = client.get(f"/paperapi/sessions/{session_id}/messages")
+    assert hist_resp.status_code == 404
+    assert hist_resp.json()["detail"] == "session not found"
+
     resp = client.get("/paperapi/sessions/list", params={"user_id": "user_delete"})
     assert resp.status_code == 200
     assert resp.json()["sessions"] == []
@@ -74,6 +78,10 @@ def test_hard_delete_session(client):
     del_resp = client.delete(f"/paperapi/sessions/{session_id}", params={"hard": "true"})
     assert del_resp.status_code == 200
     assert del_resp.json()["ok"] is True
+
+    hist_resp = client.get(f"/paperapi/sessions/{session_id}/messages")
+    assert hist_resp.status_code == 404
+    assert hist_resp.json()["detail"] == "session not found"
 
     sessions_repo = SessionsRepo(db.get_engine())
     assert sessions_repo.get_session(session_id) is None
@@ -170,6 +178,24 @@ def test_chat_flow(client):
     # Verify assistant message (accumulated from stream)
     asst_msg = next(m for m in messages if m["role"] == "assistant")
     assert asst_msg["parts"][0]["content"] == "Mocked Agent Response"
+
+
+def test_messages_returns_session_title(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_msg_title"})
+    session_id = create_resp.json()["session_id"]
+
+    rename_resp = client.patch(
+        f"/paperapi/sessions/{session_id}/title",
+        json={"title": "会话标题-用于history"},
+    )
+    assert rename_resp.status_code == 200
+
+    hist_resp = client.get(f"/paperapi/sessions/{session_id}/messages")
+    assert hist_resp.status_code == 200
+    hist_data = hist_resp.json()
+    assert hist_data["session_id"] == session_id
+    assert hist_data["title"] == "会话标题-用于history"
+    assert "messages" in hist_data
 
 
 def test_update_title_after_chat(client):

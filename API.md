@@ -132,6 +132,14 @@
 }
 ```
 
+- 示例：
+
+```bash
+curl -X PATCH "http://localhost:8002/paperapi/sessions/<session_id>/title" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"我的新标题"}'
+```
+
 - Response（200）：返回更新后的 session
 
 ```json
@@ -155,6 +163,18 @@
 
 ```json
 {"ok": true}
+```
+
+- 示例（归档，默认）：
+
+```bash
+curl -X DELETE "http://localhost:8002/paperapi/sessions/<session_id>"
+```
+
+- 示例（永久删除）：
+
+```bash
+curl -X DELETE "http://localhost:8002/paperapi/sessions/<session_id>?hard=true"
 ```
 
 说明：
@@ -205,6 +225,7 @@ data: {"type": "thought", "content": "{...status-update...}"}
 ```json
 {
   "session_id": "c7b5f0b8-0000-0000-0000-000000000000",
+  "title": "新对话",
   "messages": [
     {
       "role": "user",
@@ -233,6 +254,9 @@ data: {"type": "thought", "content": "{...status-update...}"}
   ]
 }
 ```
+
+- 错误码：
+  - 404：`session not found`（会话不存在，或已删除/归档）
 
 ## 5. 健康检查与初始化（非 /api）
 
