@@ -1,7 +1,7 @@
 import pytest
-import json
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta
+import json
 
 from app.core import db
 from app.repositories.messages_repo import MessagesRepo
@@ -180,44 +180,36 @@ def test_chat_flow(client):
     asst_msg = next(m for m in messages if m["role"] == "assistant")
     assert asst_msg["parts"][0]["content"] == "Mocked Agent Response"
 
-
-def test_chat_stream_splits_long_text(client):
-    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_stream_split"})
+def test_chat_stream_splits_long_text(client, monkeypatch):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_split"})
     session_id = create_resp.json()["session_id"]
 
-    long_text = "Mocked Agent Response " * 10
+    long_text = "Hello World, this is a long text for streaming split."
 
     async def mock_astream_chat(*args, **kwargs):
         yield {"type": "text", "content": long_text}
 
-    with pytest.MonkeyPatch.context() as mp:
-        mock_agent = MagicMock()
-        mock_agent.astream_chat = mock_astream_chat
-        mp.setattr("app.api.chat.agent", mock_agent)
-        mp.setenv("CHAT_STREAM_CHUNK_SIZE", "8")
+    import app.api.chat as chat_api
+    chat_api.agent.astream_chat = mock_astream_chat
 
-        with client.stream(
-            "POST",
-            "/paperapi/chat",
-            json={"session_id": session_id, "text": "Hello Agent"},
-        ) as response:
-            assert response.status_code == 200
-            lines = list(response.iter_lines())
+    monkeypatch.setenv("CHAT_STREAM_CHUNK_SIZE", "8")
+    monkeypatch.setenv("CHAT_STREAM_CHUNK_DELAY_MS", "0")
+    monkeypatch.setenv("CHAT_STREAM_PUNCT_DELAY_MS", "0")
 
-    data_lines: list[str] = []
+    with client.stream("POST", "/paperapi/chat", json={"session_id": session_id, "text": "x"}) as response:
+        assert response.status_code == 200
+        lines = list(response.iter_lines())
+
+    text_parts = []
     for line in lines:
-        text_line = line.decode() if isinstance(line, (bytes, bytearray)) else line
-        if text_line.startswith("data: "):
-            data_lines.append(text_line[len("data: ") :])
-
-    assert len(data_lines) > 1
-    text_pieces: list[str] = []
-    for data_line in data_lines:
-        payload = json.loads(data_line)
+        if not line.startswith("data: "):
+            continue
+        payload = json.loads(line[len("data: "):])
         if payload.get("type") == "text":
-            text_pieces.append(payload.get("content") or "")
+            text_parts.append(payload.get("content", ""))
 
-    assert "".join(text_pieces) == long_text
+    assert len(text_parts) > 1
+    assert "".join(text_parts) == long_text
 
 
 def test_messages_returns_session_title(client):

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
+import asyncio
 import json
 import os
 import re
@@ -16,6 +17,39 @@ from app.services.session_title import async_generate
 
 router = APIRouter()
 agent = AgentKitClient()
+
+def split_text(text: str, max_chars: int) -> List[str]:
+    if max_chars <= 0 or len(text) <= max_chars:
+        return [text]
+
+    tokens = re.findall(r"\S+\s*", text)
+    if not tokens:
+        return [text[i : i + max_chars] for i in range(0, len(text), max_chars)]
+
+    parts: List[str] = []
+    buf = ""
+    for token in tokens:
+        if not buf:
+            buf = token
+            continue
+
+        if len(buf) + len(token) <= max_chars:
+            buf += token
+        else:
+            parts.append(buf)
+            buf = token
+
+    if buf:
+        parts.append(buf)
+
+    final_parts: List[str] = []
+    for part in parts:
+        if len(part) <= max_chars:
+            final_parts.append(part)
+            continue
+        final_parts.extend(part[i : i + max_chars] for i in range(0, len(part), max_chars))
+
+    return final_parts
 
 
 # ---------- request / response models ----------
@@ -74,42 +108,10 @@ async def chat(
 
     async def event_generator():
         full_answer = ""
-        stream_chunk_size_raw = os.getenv("CHAT_STREAM_CHUNK_SIZE", "16")
-        try:
-            stream_chunk_size = int(stream_chunk_size_raw)
-        except ValueError:
-            stream_chunk_size = 16
-
-        if stream_chunk_size <= 0:
-            stream_chunk_size = 16
-
-        def split_text(text: str) -> list[str]:
-            if not text:
-                return []
-            tokens = re.findall(r"\S+\s*", text)
-            if not tokens:
-                tokens = [text]
-            chunks: list[str] = []
-            current = ""
-            for token in tokens:
-                if len(token) > stream_chunk_size:
-                    if current:
-                        chunks.append(current)
-                        current = ""
-                    for i in range(0, len(token), stream_chunk_size):
-                        piece = token[i : i + stream_chunk_size]
-                        if piece:
-                            chunks.append(piece)
-                    continue
-                if current and len(current) + len(token) > stream_chunk_size:
-                    chunks.append(current)
-                    current = token
-                else:
-                    current += token
-            if current:
-                chunks.append(current)
-            return chunks
-
+        max_chars = int(os.getenv("CHAT_STREAM_CHUNK_SIZE", "16"))
+        base_delay_ms = int(os.getenv("CHAT_STREAM_CHUNK_DELAY_MS", "25"))
+        punct_delay_ms = int(os.getenv("CHAT_STREAM_PUNCT_DELAY_MS", "80"))
+        punct_chars = set("。！？!?；;.\n")
         try:
             async for chunk in agent.astream_chat(
                 session_id=session_id,
@@ -117,17 +119,24 @@ async def chat(
                 use_public_paper=payload.use_public_paper,
             ):
                 if chunk.get("type") == "text":
-                    content = chunk.get("content")
-                    if isinstance(content, str):
-                        full_answer += content
-                        for piece in split_text(content):
-                            piece_payload = {**chunk, "content": piece}
-                            yield f"data: {json.dumps(piece_payload)}\n\n"
-                        continue
+                    content = chunk.get("content", "")
+                    for part in split_text(content, max_chars):
+                        out_chunk = dict(chunk)
+                        out_chunk["content"] = part
+                        yield f"data: {json.dumps(out_chunk)}\n\n"
+                        full_answer += part
+                        if base_delay_ms > 0:
+                            delay_seconds = base_delay_ms / 1000.0
+                            if punct_delay_ms > 0 and part and part[-1] in punct_chars:
+                                delay_seconds += punct_delay_ms / 1000.0
+                            delay_seconds = min(delay_seconds, 0.2)
+                            await asyncio.sleep(delay_seconds)
                 elif chunk.get("type") == "error":
+                    yield f"data: {json.dumps(chunk)}\n\n"
                     full_answer += f"\n[Error: {chunk.get('content')}]"
-                yield f"data: {json.dumps(chunk)}\n\n"
-            
+                else:
+                    yield f"data: {json.dumps(chunk)}\n\n"
+
             # Save assistant message after stream ends
             if full_answer:
                 assistant_parts = [
@@ -149,4 +158,12 @@ async def chat(
             error_msg = f"Stream error: {str(e)}"
             yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
