@@ -1,4 +1,5 @@
 import pytest
+import json
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta
 
@@ -178,6 +179,45 @@ def test_chat_flow(client):
     # Verify assistant message (accumulated from stream)
     asst_msg = next(m for m in messages if m["role"] == "assistant")
     assert asst_msg["parts"][0]["content"] == "Mocked Agent Response"
+
+
+def test_chat_stream_splits_long_text(client):
+    create_resp = client.post("/paperapi/sessions", json={"user_id": "user_stream_split"})
+    session_id = create_resp.json()["session_id"]
+
+    long_text = "Mocked Agent Response " * 10
+
+    async def mock_astream_chat(*args, **kwargs):
+        yield {"type": "text", "content": long_text}
+
+    with pytest.MonkeyPatch.context() as mp:
+        mock_agent = MagicMock()
+        mock_agent.astream_chat = mock_astream_chat
+        mp.setattr("app.api.chat.agent", mock_agent)
+        mp.setenv("CHAT_STREAM_CHUNK_SIZE", "8")
+
+        with client.stream(
+            "POST",
+            "/paperapi/chat",
+            json={"session_id": session_id, "text": "Hello Agent"},
+        ) as response:
+            assert response.status_code == 200
+            lines = list(response.iter_lines())
+
+    data_lines: list[str] = []
+    for line in lines:
+        text_line = line.decode() if isinstance(line, (bytes, bytearray)) else line
+        if text_line.startswith("data: "):
+            data_lines.append(text_line[len("data: ") :])
+
+    assert len(data_lines) > 1
+    text_pieces: list[str] = []
+    for data_line in data_lines:
+        payload = json.loads(data_line)
+        if payload.get("type") == "text":
+            text_pieces.append(payload.get("content") or "")
+
+    assert "".join(text_pieces) == long_text
 
 
 def test_messages_returns_session_title(client):
